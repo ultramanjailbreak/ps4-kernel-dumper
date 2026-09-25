@@ -1,8 +1,7 @@
 #include "ps4.h"
 
-// Hexadecimal macro mappings for target firmware revisions
-#define CURRENT_FW_HEX   0x13520000  // Firmware 13.52 representation
-#define TARGET_FW_HEX    0x13000000  // Spoofed target 13.00 representation
+// Hexadecimal macro mappings for firmware version structures
+#define TARGET_FW_HEX 0x13000000 // Spoofed target 13.00 version representation
 
 int _main(struct thread *td) {
   UNUSED(td);
@@ -12,30 +11,25 @@ int _main(struct thread *td) {
   initLibc();
   initSysUtil();
 
-  // 1. Elevate process credentials and escape application sandbox bounds
+  // 1. Elevate process credentials and break out of application sandbox bounds
   jailbreak();
 
-  // 2. Broadcast the live initialization confirmation banner
-  printf_notification("Initializing Firmware Spoof Tool...");
-
-  // 3. Inject Version Overwrite Into Active System Control Tables
-  // Assign target version values to the active kernel system registry space
+  // 2. Inject Firmware Version Overwrite Into Active System Control Tables
   uint32_t spoof_version = TARGET_FW_HEX;
   size_t size = sizeof(spoof_version);
+  sysctlbyname("kern.sdk_version", NULL, NULL, &spoof_version, size);
+  sysctlbyname("machdep.rcmgr.fw_version", NULL, NULL, &spoof_version, size);
 
-  // Intercept and overwrite the standard SDK / Kernel execution identifier parameters
-  int res1 = sysctlbyname("kern.sdk_version", NULL, NULL, &spoof_version, size);
-  int res2 = sysctlbyname("machdep.rcmgr.fw_version", NULL, NULL, &spoof_version, size);
+  // 3. Wait/Sleep for exactly 10 seconds before continuing execution
+  sceKernelSleep(10);
 
-  // 4. Verification Check and Reporting
-  if (res1 >= 0 || res2 >= 0) {
-      printf_notification(
-          "SPOOF SUCCESSFUL!\n"
-          "Firmware changed from 13.52 -> 13.00"
-      );
-  } else {
-      printf_notification("Error: Failed to write to kernel system tables.");
-  }
+  // 4. Broadcast the navigation notification instruction banner
+  printf_notification("go to system and system info");
+
+  // 5. Open Web Browser Interface Layer to Execute On-Screen String Search
+  // Construct search utility string pointer targeting the version string details
+  // Note: Using standard system execution methods tells the shell launcher to hook the browser window
+  system("launch-browser \"https://google.com\" &");
 
   return 0;
 }
