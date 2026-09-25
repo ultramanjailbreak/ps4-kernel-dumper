@@ -17,7 +17,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gcc make git
-          git clone https://github.com ~/ps4-payload-sdk
+          
+          # Clones using the correct repository URL
+          git clone https://github.com/Scene-Collective/ps4-payload-sdk.git ~/ps4-payload-sdk
           cd ~/ps4-payload-sdk
           chmod +x install.sh
           sudo ./install.sh
