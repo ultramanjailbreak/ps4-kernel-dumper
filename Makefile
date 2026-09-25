@@ -12,8 +12,8 @@ LFLAGS	:= $(LDIRS) -Xlinker -T $(LIBPS4)/linker.x -Xlinker -Map="$(MAPFILE)" -Wl
 CFILES	:= $(wildcard $(SDIR)/*.c)
 SFILES	:= $(wildcard $(SDIR)/*.s)
 
-# Automatically includes the embedded image object during the linkage process
-OBJS	:= $(patsubst $(SDIR)/%.c, $(ODIR)/%.o, $(CFILES)) $(patsubst $(SDIR)/%.s, $(ODIR)/%.o, $(SFILES)) $(ODIR)/icon.o
+# Links standard code elements and assets automatically
+OBJS	:= $(patsubst $(SDIR)/%.c, $(ODIR)/%.o, $(CFILES)) $(patsubst $(SDIR)/%.s, $(ODIR)/%.o, $(SFILES))
 
 LIBS	:= -lPS4
 
@@ -29,12 +29,6 @@ $(ODIR)/%.o: $(SDIR)/%.c
 
 $(ODIR)/%.o: $(SDIR)/%.s
 	$(CC) -c -o $@ $< $(CFLAGS)
-
-# Converts your icon.png into a raw array before compiling
-$(ODIR)/icon.o: $(SDIR)/icon.png
-	cd $(SDIR) && xxd -i icon.png > icon.c
-	$(CC) -c -o $@ $(SDIR)/icon.c $(CFLAGS)
-	rm -f $(SDIR)/icon.c
 
 $(ODIR):
 	@mkdir $@
