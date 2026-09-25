@@ -11,7 +11,9 @@ CFLAGS	:= $(IDIRS) -Os -std=c11 -ffunction-sections -fdata-sections -fno-builtin
 LFLAGS	:= $(LDIRS) -Xlinker -T $(LIBPS4)/linker.x -Xlinker -Map="$(MAPFILE)" -Wl,--build-id=none -Wl,--gc-sections
 CFILES	:= $(wildcard $(SDIR)/*.c)
 SFILES	:= $(wildcard $(SDIR)/*.s)
-OBJS	:= $(patsubst $(SDIR)/%.c, $(ODIR)/%.o, $(CFILES)) $(patsubst $(SDIR)/%.s, $(ODIR)/%.o, $(SFILES))
+
+# Automatically includes the embedded image object during the linkage process
+OBJS	:= $(patsubst $(SDIR)/%.c, $(ODIR)/%.o, $(CFILES)) $(patsubst $(SDIR)/%.s, $(ODIR)/%.o, $(SFILES)) $(ODIR)/icon.o
 
 LIBS	:= -lPS4
 
@@ -27,6 +29,12 @@ $(ODIR)/%.o: $(SDIR)/%.c
 
 $(ODIR)/%.o: $(SDIR)/%.s
 	$(CC) -c -o $@ $< $(CFLAGS)
+
+# Converts your icon.png into a raw array before compiling
+$(ODIR)/icon.o: $(SDIR)/icon.png
+	cd $(SDIR) && xxd -i icon.png > icon.c
+	$(CC) -c -o $@ $(SDIR)/icon.c $(CFLAGS)
+	rm -f $(SDIR)/icon.c
 
 $(ODIR):
 	@mkdir $@
