@@ -4,8 +4,6 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/scene-collective/ps4-payload-sdk:latest # Provides the PS4 toolchain natively
     permissions:
       contents: write
     
@@ -15,8 +13,21 @@ jobs:
         with:
           submodules: true
 
+      - name: Install PS4 SDK Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc make git
+
+          # Clone and compile the official payload SDK
+          git clone https://github.com/Scene-Collective/ps4-payload-sdk.git ~/ps4-payload-sdk
+          cd ~/ps4-payload-sdk
+          chmod +x install.sh
+          sudo ./install.sh
+
       - name: Build payload
         run: |
+          # Set the required SDK path environment variable
+          export PS4SDK=/opt/ps4sdk
           make
 
       - name: Upload to GitHub Releases
