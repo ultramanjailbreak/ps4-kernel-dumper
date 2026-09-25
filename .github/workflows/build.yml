@@ -5,7 +5,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Required to upload assets to GitHub Releases
+      contents: write
     
     steps:
       - name: Checkout repository
@@ -13,19 +13,24 @@ jobs:
         with:
           submodules: true
 
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc make
+
       - name: Build payload
         uses: Scene-Collective/ps4-payload-sdk@v1.0.0
         with:
           app_path: .
           build_command: make
 
-      - name: List built files
-        run: find . -name "*.bin" -o -name "*.elf"
-
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/') # Optional: Only release when you push a Git tag (e.g., v1.0)
         with:
+          tag_name: latest
+          name: "Latest Automagic Build"
+          draft: false
+          prerelease: false
           files: "*.bin"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
