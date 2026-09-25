@@ -1,61 +1,69 @@
 #include "ps4.h"
 
-// Configuration constants for the interface window
-#define WINDOW_WIDTH  550
-#define WINDOW_HEIGHT 150
-#define COLOR_PINK    0x99B469FF  // RGBA: Red, Green, Blue, Alpha (0x99 alpha gives approx 40% transparency)
-#define COLOR_WHITE   0xFFFFFFFF  // RGBA: Solid White for legible text
+#define BUTTON_COMBINATION (PAD_OPTIONS | PAD_CROSS)
+#define HOLD_TIME_MS 3000 // 3 seconds hold time
+#define CHECK_INTERVAL_MS 100 // Poll buttons every 100ms
 
 int _main(struct thread *td) {
   UNUSED(td);
 
-  // Initialize essential core system wrappers
+  // Initialize essential system libraries
   initKernel();
   initLibc();
   initSysUtil();
 
-  // 1. Broadcast the initial system notification
-  printf_notification("Loading GayHelper 6.9");
-
-  // Escaping sandbox limitations to request hardware access for the video layer
+  // Escape the sandbox to allow file reading and background audio system operations
   jailbreak();
 
-  // 2. Initialize the PS4 2D Graphics Engine context
-  initGraphics();
+  // 1. Send the requested single system notification banner
+  printf_notification("Loading GayHelper 6.9");
 
-  // Fetch frame buffer specifications directly from the active engine state
-  int canvas_width, canvas_height;
-  get_screen_size(&canvas_width, &canvas_height);
-  
-  // Display overlay loop counter (runs for roughly 5 seconds at 60fps)
-  int frames = 300; 
-  while(frames > 0) {
-      
-      // Retrieve the current memory address pointer for the active draw canvas frame
-      uint32_t *frame_buffer = (uint32_t *)get_buffer_address();
-      
-      // Render Logic: Draw the window box container in the upper left corner
-      for (int y = 50; y < (50 + WINDOW_HEIGHT); y++) {
-          for (int x = 50; x < (50 + WINDOW_WIDTH); x++) {
-              // Map 2D coordinates directly onto the linear 1D memory array of the active frame buffer
-              frame_buffer[y * canvas_width + x] = COLOR_PINK;
-          }
-      }
+  // Initialize the PS4 controller handle subsystem
+  // Assumes user is using controller handle ID 0 (primary pad)
+  int pad_handle = scePadOpen(0, 0, 0, NULL);
 
-      // Font Engine Logic: Draw active strings natively into the display layer
-      draw_string(70, 80, "THIS PS4 IS GAY", COLOR_WHITE, COLOR_PINK);
-      draw_string(70, 110, "expiration date: never bc ur ps4 is gay now", COLOR_WHITE, COLOR_PINK);
+  unsigned int current_buttons = 0;
+  int held_duration = 0;
 
-      // Flip/update screen frames to push raw pixels into display visibility 
-      flipGraphics();
+  // Background listening loop for button triggers
+  while (1) {
+    // Read current state data from the controller
+    ScePadData pad_data;
+    if (scePadReadState(pad_handle, &pad_data) == 0) {
+        current_buttons = pad_data.buttons;
+    }
 
-      // Synchronize video output timing with the display refresh clock (V-Blank)
-      sceKernelUsleep(16666); 
-      frames--;
+    // Check if both Options and X buttons are currently held down together
+    if ((current_buttons & BUTTON_COMBINATION) == BUTTON_COMBINATION) {
+        held_duration += CHECK_INTERVAL_MS;
+
+        // If the combo has been held continuously for 3000ms (3 seconds)
+        if (held_duration >= HOLD_TIME_MS) {
+            
+            // 2. Play the custom hello.mp3 file via native system media services
+            // This system command tells the media shell to play the file globally in the background
+            system("orbis-player /data/self/system/common/hello.mp3 &");
+            
+            // Visual validation popup confirming audio execution
+            printf_notification("Playing hello.mp3");
+
+            // Reset loop hold tracker and pause briefly to avoid playing multiple times back-to-back
+            held_duration = 0;
+            sceKernelUsleep(2000000); // 2-second cooldown sleep period
+        }
+    } else {
+        // Reset counter immediately if the user releases either button early
+        held_duration = 0;
+    }
+
+    // Synchronize loop cycles to manage hardware resource consumption
+    sceKernelUsleep(CHECK_INTERVAL_MS * 1000);
   }
 
-  // Graceful cleanup: Release the graphics hardware hooks back to the operating system
-  endGraphics();
+  // Safe resource termination clean up on exit
+  if (pad_handle >= 0) {
+      scePadClose(pad_handle);
+  }
 
   return 0;
 }
