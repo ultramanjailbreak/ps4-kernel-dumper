@@ -1,40 +1,39 @@
 #include "ps4.h"
+#define SPOOF_FW 0x505003100
+                 
+////Credits to zerofo
+//https://github.com/zerofo/ps4-sdk-spoofer
 
-int _main(struct thread *td) {
-  UNUSED(td);
+///////* examples *\\\\\\\\
 
-  // Initialize essential core system wrappers safely
-  initKernel();
-  initLibc();
-  initSysUtil();
+//Thanks to psdevwiki 
+//https://www.psdevwiki.com/ps4/SCEI_PS4_SDK
 
-  // 1. Elevate process credentials and break out of the application sandbox context
-  jailbreak();
+//PS4 FW 0x8008041000 (8.00)
+//PS4 FW 0x6720001000 (6.72)
+//PS4 FW 0x7020001000 (7.02)
+//PS4 FW 0x4740001000 (4.74)
+//PS4 FW 0x4550.01100 (4.55)
+//PS4 FW 0x4050001000 (4.05)
+//PS4 FW 0x5050031000 (5.05)
+//PS4 FW 0x9600079000 (9.60)
+//PS4 FW 0x1760001000 (1.76)
+//PS4 FW 0x3550001000 (3.55)
 
-  // 2. Broadcast the live initialization confirmation banner
-  printf_notification("Activating Production Debug Settings...");
-
-  // 3. Define the actual boolean activation value (1 = Enabled)
-  int activate = 1;
-  size_t size = sizeof(activate);
-
-  // 4. Update the real Kernel System Control parameters (sysctl)
-  // These calls directly modify the active Registry Manager subsystem flags
-  
-  // Set internal development node mode to active
-  sysctlbyname("machdep.rcmgr.intdev", NULL, NULL, &activate, size);
-  
-  // Set system debugger permissions to active
-  sysctlbyname("machdep.rcmgr.sl_debugger", NULL, NULL, &activate, size);
-  
-  // Force the main user interface shell to populate the real Debug Options menu
-  sysctlbyname("machdep.rcmgr.debug_menu", NULL, NULL, &activate, size);
-  
-  // Unshackle internal package installation permissions (Allows PKG installation)
-  sysctlbyname("machdep.rcmgr.flaged_updater", NULL, NULL, &activate, size);
-
-  // 5. Broadcast success message completion banner
-  printf_notification("Debug Settings Successfully Activated!\nCheck the bottom of System Settings.");
-
-  return 0;
+int _main(struct) thread *td) {
+    UNUSED(td);
+	
+	initkernel();
+	initlibc();
+	
+	jailbreak();
+	sdk_spoofer(SPOOF_FW);
+	
+	initsysutil();
+	
+	printf_notification("firmware spoofed to 5.05 by zerofo,n00d");
+	
+	
+	return 0;
+	
 }
