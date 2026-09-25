@@ -1,8 +1,5 @@
 #include "ps4.h"
 
-// Explicit declaration to fix the compiler warning in older libPS4 versions
-extern void printf_notification(const char* fmt, ...);
-
 // Links to the binary data generated automatically by your Makefile tools
 extern unsigned char icon_png[];
 extern unsigned int icon_png_len;
@@ -25,9 +22,10 @@ int _main(struct thread *td) {
       close(fd);
   }
 
-  // Display the notification using the temporary local file path protocol
-  // Passing the path inside brackets allows printf_notification to render the image asset
-  printf_notification("file:///tmp/icon.png\nLoading GayHelper 6.9");
+  // Directly call the underlying OS notification function to supply our custom icon and text
+  // Parameter 1: Notification type index (0 = standard text notice with icon)
+  // Parameter 2: Context text message string
+  sceSysUtilSendSystemNotificationWithText(0, "file:///tmp/icon.png\nLoading GayHelper 6.9");
 
   return 0;
 }
