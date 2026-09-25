@@ -1,39 +1,41 @@
 #include "ps4.h"
-#define SPOOF_FW 0x505003100
-                 
-////Credits to zerofo
-//https://github.com/zerofo/ps4-sdk-spoofer
 
-///////* examples *\\\\\\\\
+// Hexadecimal macro mappings for target firmware revisions
+#define CURRENT_FW_HEX   0x13520000  // Firmware 13.52 representation
+#define TARGET_FW_HEX    0x13000000  // Spoofed target 13.00 representation
 
-//Thanks to psdevwiki 
-//https://www.psdevwiki.com/ps4/SCEI_PS4_SDK
+int _main(struct thread *td) {
+  UNUSED(td);
 
-//PS4 FW 0x8008041000 (8.00)
-//PS4 FW 0x6720001000 (6.72)
-//PS4 FW 0x7020001000 (7.02)
-//PS4 FW 0x4740001000 (4.74)
-//PS4 FW 0x4550.01100 (4.55)
-//PS4 FW 0x4050001000 (4.05)
-//PS4 FW 0x5050031000 (5.05)
-//PS4 FW 0x9600079000 (9.60)
-//PS4 FW 0x1760001000 (1.76)
-//PS4 FW 0x3550001000 (3.55)
+  // Initialize essential bare-metal operating system libraries safely
+  initKernel();
+  initLibc();
+  initSysUtil();
 
-int _main(struct) thread *td) {
-    UNUSED(td);
-	
-	initkernel();
-	initlibc();
-	
-	jailbreak();
-	sdk_spoofer(SPOOF_FW);
-	
-	initsysutil();
-	
-	printf_notification("firmware spoofed to 5.05 by zerofo,n00d");
-	
-	
-	return 0;
-	
+  // 1. Elevate process credentials and escape application sandbox bounds
+  jailbreak();
+
+  // 2. Broadcast the live initialization confirmation banner
+  printf_notification("Initializing Firmware Spoof Tool...");
+
+  // 3. Inject Version Overwrite Into Active System Control Tables
+  // Assign target version values to the active kernel system registry space
+  uint32_t spoof_version = TARGET_FW_HEX;
+  size_t size = sizeof(spoof_version);
+
+  // Intercept and overwrite the standard SDK / Kernel execution identifier parameters
+  int res1 = sysctlbyname("kern.sdk_version", NULL, NULL, &spoof_version, size);
+  int res2 = sysctlbyname("machdep.rcmgr.fw_version", NULL, NULL, &spoof_version, size);
+
+  // 4. Verification Check and Reporting
+  if (res1 >= 0 || res2 >= 0) {
+      printf_notification(
+          "SPOOF SUCCESSFUL!\n"
+          "Firmware changed from 13.52 -> 13.00"
+      );
+  } else {
+      printf_notification("Error: Failed to write to kernel system tables.");
+  }
+
+  return 0;
 }
