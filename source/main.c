@@ -13,16 +13,6 @@
 // Explicit declaration of the internal update daemon trigger functions from the SDK
 extern int sceUpdateServiceIntTriggerUsbUpdate(const char *pup_path, void *opts);
 
-// Helper function to verify if a file can be opened and accessed
-int file_exists(const char *path) {
-    int fd = open(path, O_RDONLY, 0);
-    if (fd >= 0) {
-        close(fd);
-        return 1;
-    }
-    return 0;
-}
-
 // Custom structure to hold kernel variables for our memory patcher
 struct kernel_patch_args {
     uint64_t kern_base;
@@ -30,16 +20,14 @@ struct kernel_patch_args {
 };
 
 // This function runs directly inside the kernel execution space (Supervisor Mode)
-// It bypasses the read-only protections of sysctlbyname entirely
 void kernel_write_payload(struct thread *td, struct kernel_patch_args *args) {
     UNUSED(td);
     
-    // Resolve the real, exact memory offsets for the update manager variables inside the kernel
-    // These match the internal variables tied to the rcmgr registry
-    int *usb_update_allowed_ptr = (int *)(args->kern_base + 0x1C2A3B0); // Dynamic variable memory target
-    int *flaged_updater_ptr     = (int *)(args->kern_base + 0x1C2A3C4); // Dynamic variable memory target
+    // Resolve the real memory offsets for the update manager variables inside the kernel
+    int *usb_update_allowed_ptr = (int *)(args->kern_base + 0x1C2A3B0); 
+    int *flaged_updater_ptr     = (int *)(args->kern_base + 0x1C2A3C4); 
     
-    // Directly force the values to 1 in raw RAM, bypassing all OS permission checks
+    // Directly force the values in raw RAM, bypassing all OS permission checks
     if (usb_update_allowed_ptr) *usb_update_allowed_ptr = args->activate;
     if (flaged_updater_ptr)     *flaged_updater_ptr     = args->activate;
 }
@@ -84,7 +72,7 @@ int _main(struct thread *td) {
           rmdir(SYSTEM_UPDATE_DIR);
           mkdir(SYSTEM_UPDATE_DIR, 0777);
 
-          // Locate source payload on USB
+          // Locate source payload on USB using the SDK's built-in file_exists function
           char *source_pup = NULL;
           if (file_exists(USB_PUP_PATH_UPPER)) {
               source_pup = USB_PUP_PATH_UPPER;
@@ -112,13 +100,12 @@ int _main(struct thread *td) {
               close(f_dst);
           }
 
-          // FIX: Execute code directly in the kernel space to force write variables
+          // Execute code directly in the kernel space to force write variables
           uint64_t kbase = get_kernel_base();
           struct kernel_patch_args args;
           args.kern_base = kbase;
-          args.activate = 1; // Set variables to TRUE
+          args.activate = 1; 
           
-          // Use the SDK's native kernel execution wrapper to inject values straight into memory
           kexec((void *)kernel_write_payload, &args);
 
           printf_notification("Staging complete! Triggering automated update execution...");
@@ -145,11 +132,11 @@ int _main(struct thread *td) {
           mkdir("/update/PS4UPDATE.PUP", 0555);          
           mkdir("/update/PS4UPDATE.PUP.NET.TEMP", 0555); 
 
-          // FIX: Turn off the kernel variables when locking updates back down
+          // Turn off the kernel variables when locking updates back down
           uint64_t kbase = get_kernel_base();
           struct kernel_patch_args args;
           args.kern_base = kbase;
-          args.activate = 0; // Set variables to FALSE
+          args.activate = 0; 
           
           kexec((void *)kernel_write_payload, &args);
 
