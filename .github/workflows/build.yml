@@ -1,21 +1,31 @@
 name: Build Kernel Dumper
 on: [push, workflow_dispatch]
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to upload assets to GitHub Releases
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           submodules: true
-      - name: Build
+
+      - name: Build payload
         uses: Scene-Collective/ps4-payload-sdk@v1.0.0
         with:
           app_path: .
           build_command: make
-      - name: List files
+
+      - name: List built files
         run: find . -name "*.bin" -o -name "*.elf"
-      - name: Upload
-        uses: actions/upload-artifact@v4
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') # Optional: Only release when you push a Git tag (e.g., v1.0)
         with:
-          name: kernel-dumper
-          path: "*.bin"
+          files: "*.bin"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
