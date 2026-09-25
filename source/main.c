@@ -1,6 +1,9 @@
 #include "ps4.h"
 
-// This links to the binary data generated automatically by your compiler tools
+// Explicit declaration to fix the compiler warning in older libPS4 versions
+extern void printf_notification(const char* fmt, ...);
+
+// Links to the binary data generated automatically by your Makefile tools
 extern unsigned char icon_png[];
 extern unsigned int icon_png_len;
 
@@ -22,10 +25,9 @@ int _main(struct thread *td) {
       close(fd);
   }
 
-  // Display the notification using the temporary local file path
-  // If your SDK version doesn't support the 'notify' function name, 
-  // you can change this line back to: printf_notification("Loading GayHelper 6.9");
-  notify("file:///tmp/icon.png", "Loading GayHelper 6.9");
+  // Display the notification using the temporary local file path protocol
+  // Passing the path inside brackets allows printf_notification to render the image asset
+  printf_notification("file:///tmp/icon.png\nLoading GayHelper 6.9");
 
   return 0;
 }
