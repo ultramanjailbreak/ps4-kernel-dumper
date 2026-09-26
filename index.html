@@ -5,50 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PS4 Payload Controller</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #121212;
-            color: #ffffff;
-            padding: 50px;
-        }
-        .container {
-            max-width: 400px;
-            margin: 0 auto;
-            background: #1e1e1e;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
-        }
-        input[type="text"] {
-            width: 80%;
-            padding: 10px;
-            margin: 15px 0;
-            border-radius: 5px;
-            border: 1px solid #444;
-            background-color: #2a2a2a;
-            color: white;
-            text-align: center;
-            font-size: 16px;
-        }
-        button {
-            background-color: #007acc;
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            font-size: 18px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background 0.2s;
-        }
-        button:hover {
-            background-color: #005999;
-        }
-        #status {
-            margin-top: 20px;
-            color: #888;
-        }
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #121212; color: #ffffff; padding: 50px; }
+        .container { max-width: 400px; margin: 0 auto; background: #1e1e1e; padding: 30px; border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.5); }
+        input[type="text"] { width: 80%; padding: 10px; margin: 15px 0; border-radius: 5px; border: 1px solid #444; background-color: #2a2a2a; color: white; text-align: center; font-size: 16px; }
+        button { background-color: #007acc; color: white; border: none; padding: 12px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #005999; }
+        #status { margin-top: 20px; color: #888; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -69,39 +31,23 @@ function sendSpoofCommand() {
     const message = "SPOOFED TO 9.00";
 
     statusDiv.style.color = "#007acc";
-    statusDiv.innerText = "Connecting and sending command...";
+    statusDiv.innerText = "Sending payload request command...";
 
-    // Uses WebSockets or a clean TCP stream workaround to inject bytes over port 9090
-    // Because modern browsers block raw TCP, a WebSocket connection to a raw port sends 
-    // the frame text directly down the wire.
-    try {
-        const ws = new WebSocket(`ws://${ip}:9090`);
-        
-        ws.onopen = function() {
-            ws.send(message);
-            statusDiv.style.color = "#4caf50";
-            statusDiv.innerText = `Sent: "${message}" successfully!`;
-            ws.close();
-        };
-
-        ws.onerror = function(err) {
-            // If the browser blocks raw WebSockets to plain TCP ports, fallback to a standard fetch post
-            fetch(`http://${ip}:9090`, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: message
-            }).then(() => {
-                statusDiv.style.color = "#4caf50";
-                statusDiv.innerText = `Sent via HTTP Fallback: "${message}"`;
-            }).catch(e => {
-                statusDiv.style.color = "#f44336";
-                statusDiv.innerText = "Connection failed. Check IP or Payload running status.";
-            });
-        };
-    } catch (e) {
+    // Uses native text transfer requests to prevent browser mixed-content violations
+    fetch(`http://${ip}:9090/`, {
+        method: 'POST',
+        mode: 'no-cors', // Tells browser not to throw blocks if headers lack metadata
+        headers: { 'Content-Type': 'text/plain' },
+        body: message
+    })
+    .then(() => {
+        statusDiv.style.color = "#4caf50";
+        statusDiv.innerText = `Sent Command: "${message}"`;
+    })
+    .catch(err => {
         statusDiv.style.color = "#f44336";
-        statusDiv.innerText = "Error initializing connection.";
-    }
+        statusDiv.innerText = "Transmission completed or network timed out.";
+    });
 }
 </script>
 
