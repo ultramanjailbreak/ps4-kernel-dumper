@@ -1,89 +1,86 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-
-#ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #include <windows.h>  // Required for Sleep() on Windows
-    #pragma comment(lib, "ws2_32.lib")
-    #define sleep_ms(ms) Sleep(ms)
-#else
-    #include <unistd.h>
-    #include <arpa/inet.h>
-    #include <sys/socket.h>
-    #define sleep_ms(ms) usleep((ms) * 1000)
-#endif
+#include <ps4.h>
 
 // Configuration parameters
-#define PS4_IP        "192.168.10.36"
-#define PS4_PORT      744
 #define CURRENT_FW    "13.52"
-#define TARGET_TEXT   "FBI TEST"  // Updated text string to spoof into memory
+#define TARGET_TEXT   "FBI TEST"
 
-void close_socket(int sock) {
-#ifdef _WIN32
-    closesocket(sock);
-#else
-    close(sock);
-#endif
+// Helper function to find a byte pattern in memory
+static uint8_t *find_pattern(uint8_t *start, size_t length, const uint8_t *pattern, size_t pattern_len) {
+    if (pattern_len > length) return NULL;
+    for (size_t i = 0; i <= length - pattern_len; i++) {
+        if (memcmp(start + i, pattern, pattern_len) == 0) {
+            return start + i;
+        }
+    }
+    return NULL;
 }
 
-int main() {
-    printf("shitspoof C-Edition 0.0001: never update edition\n");
-    printf("============================================================\n");
-    printf("[*] Preparation: Please get ready to navigate on your PS4.\n");
-    printf("============================================================\n\n");
+// The standard entry point function for the ps4-payload-sdk
+int payload_main(void *payload_args) {
+    // 1. Initialize system library wrappers
+    initKernel();
+    initLibc();
 
-    // 10-second visual countdown delay
+    // 2. 10-second visual countdown loop using the PS4 native kernel sleep function
+    // (1,000,000 microseconds = 1 second)
     for (int i = 10; i > 0; i--) {
-        printf("[!] Waiting %d seconds... Open 'System Information' on your PS4 now!\n", i);
-        fflush(stdout); // Forces immediate print to the terminal screen
-        sleep_ms(1000); 
-    }
-    printf("\n[*] Time's up! Starting spoof configuration: HEN %s -> %s\n", CURRENT_FW, TARGET_TEXT);
-
-#ifdef _WIN32
-    WSADATA wsa;
-    if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) {
-        printf("[!] Winsock initialization failed.\n");
-        return 1;
-    }
-#endif
-
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
-        printf("[!] Failed to create socket.\n");
-        return 1;
+        sceKernelUsleep(1000000); 
     }
 
-    struct sockaddr_in server_addr;
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PS4_PORT);
-    inet_pton(AF_INET, PS4_IP, &server_addr.sin_addr);
+    // 3. Format the search and replace strings into UTF-16LE format (used by PS4 ShellUI)
+    char old_str[32];
+    char new_str[32];
+    snprintf(old_str, sizeof(old_str), "HEN %s", CURRENT_FW);
+    snprintf(new_str, sizeof(new_str), "%s", TARGET_TEXT);
 
-    printf("[*] Connecting to ps4debug on %s:%d...\n", PS4_IP, PS4_PORT);
-    if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        printf("[!] Connection failed. Is ps4debug running on your console?\n");
-        close_socket(sock);
-        return 1;
+    uint8_t old_utf16[64] = {0};
+    uint8_t new_utf16[64] = {0};
+    size_t old_len = 0;
+    size_t new_len = 0;
+
+    for (int i = 0; old_str[i] != '\0' && old_len < 62; i++) {
+        old_utf16[old_len++] = old_str[i];
+        old_utf16[old_len++] = 0;
     }
-    printf("[+] Connected successfully!\n");
+    for (int i = 0; new_str[i] != '\0' && new_len < 62; i++) {
+        new_utf16[new_len++] = new_str[i];
+        new_utf16[new_len++] = 0;
+    }
 
-    // Format target buffers
-    char old_text[64];
-    char new_text[64];
-    snprintf(old_text, sizeof(old_text), "HEN %s", CURRENT_FW);
-    snprintf(new_text, sizeof(new_text), "%s", TARGET_TEXT);
+    // 4. Memory scanning and runtime patching
+    // Scans common userland allocation ranges where SceShellCore maps string tables
+    uint8_t *scan_start = (uint8_t *)0x800000000; 
+    size_t scan_size = 0x20000000; // 512MB scan range chunk
+    int patch_count = 0;
 
-    printf("[*] Scanning memory architecture sections for '%s'...\n", old_text);
-    printf("[*] Replacing matches with raw text layout: '%s'\n", new_text);
-    printf("[!] Mock execution completed over socket framework.\n");
+    uint8_t *match = find_pattern(scan_start, scan_size, old_utf16, old_len);
+    if (match != NULL) {
+        // If string lengths match, perform a direct inline replacement
+        if (old_len == new_len) {
+            memcpy(match, new_utf16, new_len);
+            patch_count++;
+        } 
+        // If length varies, handle string size descriptor adjustments safely
+        else {
+            uint32_t *len_prefix = (uint32_t *)(match - 4);
+            // Verify if a 4-byte length descriptor precedes the string
+            if (*len_prefix == (uint32_t)strlen(old_str)) {
+                *len_prefix = (uint32_t)strlen(new_str);
+                memcpy(match, new_utf16, new_len);
+                patch_count++;
+            }
+        }
+    }
 
-    close_socket(sock);
-#ifdef _WIN32
-    WSACleanup();
-#endif
+    // 5. Provide UI confirmation to the user on screen
+    char notification_msg[128];
+    if (patch_count > 0) {
+        snprintf(notification_msg, sizeof(notification_msg), "Spoofed to: %s\nRe-open System Info!", TARGET_TEXT);
+    } else {
+        snprintf(notification_msg, sizeof(notification_msg), "Spoof failed: Target string not found.");
+    }
+    
+    printf_notification(notification_msg);
+
     return 0;
 }
