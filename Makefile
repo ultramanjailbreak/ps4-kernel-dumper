@@ -20,14 +20,16 @@ MAPFILE := $(shell basename "$(CURDIR)").map
 IDIRS   := -I$(LIBPS4)/include -Iinclude
 LDIRS   := -L$(LIBPS4)
 
-# Compilation & Linker Flags
-# Optimized for bare-metal standalone binaries (-nostdlib, -fPIE)
+# Compilation Flags
+# Added -fno-stack-protector to stop GCC from looking for missing standard library string checks
 CFLAGS  := $(IDIRS) -Os -std=c11 -ffunction-sections -fdata-sections -fno-builtin \
-           -nostartfiles -nostdlib -Wall -Wextra -masm=intel -march=btver2 -mtune=btver2 \
-           -m64 -mabi=sysv -mcmodel=small -fpie -fPIC
+           -fno-stack-protector -nostartfiles -nostdlib -Wall -Wextra \
+           -masm=intel -march=btver2 -mtune=btver2 -m64 -mabi=sysv -mcmodel=small -fpie -fPIC
 
+# Linker Flags
+# Added -Wl,-z,noexecstack to eliminate the missing .note.GNU-stack warning
 LFLAGS  := $(LDIRS) -Xlinker -T $(LIBPS4)/linker.x -Xlinker -Map="$(MAPFILE)" \
-           -Wl,--build-id=none -Wl,--gc-sections
+           -Wl,--build-id=none -Wl,--gc-sections -Wl,-z,noexecstack
 
 LIBS    := -lPS4
 
