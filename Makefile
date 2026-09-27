@@ -1,34 +1,38 @@
 # Target binary output name
-TARGET = target_spoofer.bin
+TARGET = ez.bin
 
-# Toolchain definitions (Scene-Collective relies on standard gcc/binutils)
+# Toolchain definitions
 CC      := gcc
 OBJCOPY := objcopy
 ODIR    := build
 SDIR    := .
 
-# Target objects matching compilation setup
-OBJS    := $(ODIR)/main.o
+# Automatically find any .c file in the current directory
+SRC_FILE := $(wildcard $(SDIR)/*.c)
+OBJS     := $(ODIR)/$(notdir $(SRC_FILE:.c=.o))
 
-# SDK Directory Path mapping (dynamically linked via the workflow environment)
+# SDK Directory Path mapping
 LIBPS4  := $(PS4SDK)/libPS4
 
 # Compilation and Linking flags for raw flat payloads
 CFLAGS  := -I$(LIBPS4)/include -O2 -std=c11 -Wall -Wextra -fno-builtin -nostdlib -fPIC
-LFLAGS  := -T $(LIBPS4)/linker.x -Xlinker -odir build -Xlinker -Tdata=0x926200000
+LDFLAGS := -T $(LIBPS4)/linker.x -Xlinker -odir build -Xlinker -Tdata=0x926200000
 
-# Compilation Instructions
 all: $(TARGET)
 
-$(ODIR)/%.o: $(SDIR)/%.c | $(ODIR)
+# Rule to compile the source file (explicitly makes build directory first)
+$(ODIR)/%.o: $(SDIR)/%.c
+	@mkdir -p $(ODIR)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-$(ODIR):
-	@mkdir -p $@
+# Fallback rule in case files are inside a "src" folder
+$(ODIR)/%.o: $(SDIR)/src/%.c
+	@mkdir -p $(ODIR)
+	$(CC) -c -o $@ $< $(CFLAGS)
 
-# Chains the assembly bootstrap crt0 and compilation objects into a raw flat binary binary
+# Chains objects into raw flat binary format
 $(TARGET): $(OBJS)
-	$(CC) $(LIBPS4)/crt0.s $(OBJS) -o $(ODIR)/temp.t $(CFLAGS) $(LFLAGS) -L$(LIBPS4) -lPS4
+	$(CC) $(LIBPS4)/crt0.s $(OBJS) -o $(ODIR)/temp.t $(CFLAGS) $(LDFLAGS) -L$(LIBPS4) -lPS4
 	$(OBJCOPY) -O binary $(ODIR)/temp.t $(TARGET)
 	@rm -f $(ODIR)/temp.t
 	@echo "---------------------------------------"
