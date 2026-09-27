@@ -19,7 +19,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends gcc make git
           
           # Clones and installs the underlying Scene-Collective payload SDK
-          git clone https://github.com ~/ps4-payload-sdk
+          git https://github.com/Scene-Collective/ps4-payload-sdk.git ~/ps4-payload-sdk
           cd ~/ps4-payload-sdk
           chmod +x install.sh
           sudo ./install.sh
