@@ -1,69 +1,41 @@
-# Ensure the PS4 SDK environment variable is defined
-ifeq ($(PS4SDK),)
-$(error "Please set your PS4SDK environment variable before running make.")
-endif
+# Target binary output name
+TARGET = target_spoofer.bin
 
-# Path Configuration
-LIBPS4  := $(PS4SDK)/libPS4
-ODIR    := build
-SDIR    := source
-
-# Compiler & Toolchain Definition
+# Toolchain definitions (Scene-Collective relies on standard gcc/binutils)
 CC      := gcc
 OBJCOPY := objcopy
+ODIR    := build
+SDIR    := .
 
-# Target Configurations
-TARGET  := $(shell basename "$(CURDIR)").bin
-MAPFILE := $(shell basename "$(CURDIR)").map
+# Target objects matching compilation setup
+OBJS    := $(ODIR)/main.o
 
-# Include and Library Directories
-IDIRS   := -I$(LIBPS4)/include -Iinclude
-LDIRS   := -L$(LIBPS4)
+# SDK Directory Path mapping (dynamically linked via the workflow environment)
+LIBPS4  := $(PS4SDK)/libPS4
 
-# Compilation Flags
-# Added -fno-stack-protector to stop GCC from looking for missing standard library string checks
-CFLAGS  := $(IDIRS) -Os -std=c11 -ffunction-sections -fdata-sections -fno-builtin \
-           -fno-stack-protector -nostartfiles -nostdlib -Wall -Wextra \
-           -masm=intel -march=btver2 -mtune=btver2 -m64 -mabi=sysv -mcmodel=small -fpie -fPIC
+# Compilation and Linking flags for raw flat payloads
+CFLAGS  := -I$(LIBPS4)/include -O2 -std=c11 -Wall -Wextra -fno-builtin -nostdlib -fPIC
+LFLAGS  := -T $(LIBPS4)/linker.x -Xlinker -odir build -Xlinker -Tdata=0x926200000
 
-# Linker Flags
-# Added -Wl,-z,noexecstack to eliminate the missing .note.GNU-stack warning
-LFLAGS  := $(LDIRS) -Xlinker -T $(LIBPS4)/linker.x -Xlinker -Map="$(MAPFILE)" \
-           -Wl,--build-id=none -Wl,--gc-sections -Wl,-z,noexecstack
-
-LIBS    := -lPS4
-
-# Source Files Discovery
-CFILES  := $(wildcard $(SDIR)/*.c)
-SFILES  := $(wildcard $(SDIR)/*.s)
-
-# Object Files Mapping
-OBJS    := $(patsubst $(SDIR)/%.c, $(ODIR)/%.o, $(CFILES)) \
-           $(patsubst $(SDIR)/%.s, $(ODIR)/%.o, $(SFILES))
-
-.PHONY: all clean
-
+# Compilation Instructions
 all: $(TARGET)
 
-# Link the output payload binary
-$(TARGET): $(ODIR) $(OBJS)
-	$(CC) $(LIBPS4)/crt0.s $(ODIR)/*.o -o temp.t $(CFLAGS) $(LFLAGS) $(LIBS)
-	$(OBJCOPY) -O binary temp.t "$(TARGET)"
-	@rm -f temp.t
-	@echo "Build successful: $(TARGET)"
-
-# Compile C source files into objects
-$(ODIR)/%.o: $(SDIR)/%.c
+$(ODIR)/%.o: $(SDIR)/%.c | $(ODIR)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-# Assemble assembly source files into objects
-$(ODIR)/%.o: $(SDIR)/%.s
-	$(CC) -c -o $@ $< $(CFLAGS)
-
-# Create build output directory if missing
 $(ODIR):
 	@mkdir -p $@
 
-# Clean up all generated build artifacts
+# Chains the assembly bootstrap crt0 and compilation objects into a raw flat binary binary
+$(TARGET): $(OBJS)
+	$(CC) $(LIBPS4)/crt0.s $(OBJS) -o $(ODIR)/temp.t $(CFLAGS) $(LFLAGS) -L$(LIBPS4) -lPS4
+	$(OBJCOPY) -O binary $(ODIR)/temp.t $(TARGET)
+	@rm -f $(ODIR)/temp.t
+	@echo "---------------------------------------"
+	@echo "Flat binary successfully compiled: $(TARGET)"
+	@echo "---------------------------------------"
+
 clean:
-	rm -rf "$(TARGET)" "$(MAPFILE)" $(ODIR)
+	rm -rf $(ODIR) $(TARGET)
+
+.PHONY: all clean
