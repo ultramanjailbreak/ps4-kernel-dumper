@@ -1,45 +1,36 @@
-# Target binary output name
-TARGET = ez.bin
+# Default parameters for deployment testing
+PS4_HOST ?= ps4
+PS4_PORT ?= 9090  # Updated to match GoldHEN's 9090 layout
 
-# Toolchain definitions
-CC      := gcc
-OBJCOPY := objcopy
-ODIR    := build
-SDIR    := .
+# Map environmental variables directly from your workflow setup
+ifdef PS4SDK
+    include $(PS4SDK)/toolchain/orbis.mk
+else ifdef PS4_PAYLOAD_SDK
+    include $(PS4_PAYLOAD_SDK)/toolchain/orbis.mk
+else
+    $(error Neither PS4SDK nor PS4_PAYLOAD_SDK is defined)
+endif
 
-# Automatically find any .c file in the current directory
-SRC_FILE := $(wildcard $(SDIR)/*.c)
-OBJS     := $(ODIR)/$(notdir $(SRC_FILE:.c=.o))
+# Output properties mapping
+TARGET   := pup-installer
+PAYLOAD  := ez.bin
 
-# SDK Directory Path mapping
-LIBPS4  := $(PS4SDK)/libPS4
+# Discovers source configurations automatically
+SRCS := $(wildcard *.c)
+HDRS := $(wildcard *.h)
 
-# Compilation and Linking flags for raw flat payloads
-CFLAGS  := -I$(LIBPS4)/include -O2 -std=c11 -Wall -Wextra -fno-builtin -nostdlib -fPIC
-LDFLAGS := -T $(LIBPS4)/linker.x -Xlinker -odir build -Xlinker -Tdata=0x926200000
+CFLAGS := -Wall -Wextra -O2 -g
 
-all: $(TARGET)
+all: $(PAYLOAD)
 
-# Rule to compile the source file (explicitly makes build directory first)
-$(ODIR)/%.o: $(SDIR)/%.c
-	@mkdir -p $(ODIR)
-	$(CC) -c -o $@ $< $(CFLAGS)
-
-# Fallback rule in case files are inside a "src" folder
-$(ODIR)/%.o: $(SDIR)/src/%.c
-	@mkdir -p $(ODIR)
-	$(CC) -c -o $@ $< $(CFLAGS)
-
-# Chains objects into raw flat binary format
-$(TARGET): $(OBJS)
-	$(CC) $(LIBPS4)/crt0.s $(OBJS) -o $(ODIR)/temp.t $(CFLAGS) $(LDFLAGS) -L$(LIBPS4) -lPS4
-	$(OBJCOPY) -O binary $(ODIR)/temp.t $(TARGET)
-	@rm -f $(ODIR)/temp.t
-	@echo "---------------------------------------"
-	@echo "Flat binary successfully compiled: $(TARGET)"
-	@echo "---------------------------------------"
+# Compiles discovered items directly in the workspace directory
+$(PAYLOAD): $(SRCS) $(HDRS)
+	$(CC) $(CFLAGS) $(SRCS) -o $@
 
 clean:
-	rm -rf $(ODIR) $(TARGET)
+	-rm -f *.o *.elf *.bin
 
-.PHONY: all clean
+test: $(PAYLOAD)
+	echo "$(USER)" | $(PS4_DEPLOY) -i -h $(PS4_HOST) -p $(PS4_PORT) $^
+
+.PHONY: all clean test
