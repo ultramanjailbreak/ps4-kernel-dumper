@@ -1,93 +1,48 @@
-#include <stdint.h>
-#include <stddef.h>
+#define DEBUG_IP "192.168.2.2"
+#define DEBUG_PORT 9023
 
-// Include your custom header
-#include "payload.h"
+// Include standard Scene-Collective PS4 library headers
+#include <ps4.h>
 
-// Explicitly declare system call wrappers or symbols provided by libPS4 if they 
-// are not available in standard headers. In libPS4, system call interfaces 
-// are often mapped via direct function signatures.
-extern int open(const char *path, int flags, ...);
-extern int close(int fd);
-extern int read(int fd, void *buf, size_t nbyte);
+#define SPOOF 0x82
 
-// Basic inline string layout builder to avoid referencing external snprintf/__snprintf_chk
-void custom_build_path(char *dst, const char *usb, const char *suffix) {
-    while (*usb) {
-        *dst++ = *usb++;
-    }
-    while (*suffix) {
-        *dst++ = *suffix++;
-    }
-    *dst = '\0';
-}
+#ifdef DEBUG_SOCKET
+int DEBUG_SOCK;
+#endif
 
-const char *usb_mounts[] = {
-    "/mnt/usb0",
-    "/mnt/usb1",
-    "/mnt/usb2"
-};
+int _main(struct thread *td) {
+  UNUSED(td);
 
-int verify_package_version(const char *filepath, uint32_t *out_version) {
-    if (!filepath || !out_version) {
-        return -1;
-    }
+  // Scene-Collective initialization functions mapping
+  initKernel();
+  initLibc();
 
-    // O_RDONLY is typically 0 in POSIX/Orbis environments
-    int fd = open(filepath, 0, 0);
-    if (fd < 0) {
-        return -2; 
-    }
+#ifdef DEBUG_SOCKET
+  initNetwork();
+  struct sockaddr_in server;
+  server.sin_len = sizeof(server);
+  server.sin_family = AF_INET;
+  server.sin_addr.s_addr = sceNetHtonl(IP(192, 168, 2, 2)); // Or parse DEBUG_IP
+  server.sin_port = sceNetHtons(DEBUG_PORT);
+  DEBUG_SOCK = sceNetSocket("debug_sock", AF_INET, SOCK_STREAM, 0);
+  sceNetConnect(DEBUG_SOCK, (struct sockaddr *)&server, sizeof(server));
+#endif
 
-    SystemPackageHeader header;
-    int bytes_read = read(fd, &header, sizeof(SystemPackageHeader));
-    close(fd);
+  // Kernel modification execution
+  jailbreak();
+  
+  // Note: Ensure your custom platform offsets/functions for 'spoof_target_id' 
+  // are included or accessible if they are missing from your base SDK version.
+  spoof_target_id(SPOOF);
 
-    if (bytes_read < (int)sizeof(SystemPackageHeader)) {
-        return -3; 
-    }
+  initSysUtil();
 
-    *out_version = header.target_fw;
-    return 0; 
-}
+  // Displays native notification box on the PS4 UI
+  notify("Spoofing Target ID: 0x%02x!", SPOOF);
 
-int scan_storage_for_updates(char *out_path, size_t max_len, uint32_t *detected_fw) {
-    if (!out_path || max_len == 0 || !detected_fw) {
-        return 0;
-    }
+#ifdef DEBUG_SOCKET
+  sceNetSocketClose(DEBUG_SOCK);
+#endif
 
-    char target_buffer[256];
-    const char *update_suffix = "/PS4/UPDATE/PS4UPDATE.PUP";
-
-    for (size_t i = 0; i < sizeof(usb_mounts) / sizeof(usb_mounts[0]); i++) {
-        custom_build_path(target_buffer, usb_mounts[i], update_suffix);
-        
-        // Use a standard open check to verify file presence instead of 'access'
-        int fd = open(target_buffer, 0, 0);
-        if (fd >= 0) {
-            close(fd);
-            uint32_t fw_ver = 0;
-            if (verify_package_version(target_buffer, &fw_ver) == 0) {
-                // Manual safe copy loop to avoid strncpy / buffer checks
-                size_t j = 0;
-                while (j < max_len - 1 && target_buffer[j] != '\0') {
-                    out_path[j] = target_buffer[j];
-                    j++;
-                }
-                out_path[j] = '\0';
-                *detected_fw = fw_ver;
-                return 1; 
-            }
-        }
-    }
-    return 0; 
-}
-
-int _main(void) {
-    char package_path[256];
-    uint32_t package_fw = 0;
-
-    scan_storage_for_updates(package_path, sizeof(package_path), &package_fw);
-
-    return 0;
+  return 0;
 }
