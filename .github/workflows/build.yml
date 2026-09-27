@@ -1,4 +1,4 @@
-name: Build Kernel Dumper
+name: Build Target Spoofer
 on: [push, workflow_dispatch]
 
 jobs:
@@ -18,8 +18,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gcc make git
           
-          # Clones using the correct repository URL
-          git clone https://github.com/Scene-Collective/ps4-payload-sdk.git ~/ps4-payload-sdk
+          # Clones and installs the underlying Scene-Collective payload SDK
+          git clone https://github.com ~/ps4-payload-sdk
           cd ~/ps4-payload-sdk
           chmod +x install.sh
           sudo ./install.sh
@@ -33,9 +33,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: "Latest Automagic Build"
+          name: "Latest Target Spoofer Build"
           draft: false
           prerelease: false
-          files: "*.bin"
+          files: "ez.bin"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
